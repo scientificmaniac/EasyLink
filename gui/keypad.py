@@ -23,14 +23,14 @@ class KeypadSearchPage:
         
         # 标题
         title_label = ttk.Label(keypad_frame, text="九键拨号搜索", 
-                               font=("Microsoft YaHei", 14, "bold"), 
+                               font=("BCU DongHui", 14, "bold"), 
                                foreground="#4a90e2")
         title_label.pack(pady=(0, 20))
         
         # 搜索结果提示
         self.keypad_result_var = tk.StringVar(value="请点击下方按钮打开拨号键盘")
         result_label = ttk.Label(keypad_frame, textvariable=self.keypad_result_var, 
-                                font=("Microsoft YaHei", 10), 
+                                font=("BCU DongHui", 10), 
                                 foreground="#666666")
         result_label.pack(pady=(0, 20))
         
@@ -119,7 +119,7 @@ class KeypadSearchPage:
         input_container.pack(fill=tk.X, padx=20, pady=10)
         
         input_entry = ttk.Entry(input_container, textvariable=self.keypad_input_var, 
-                               font=("Microsoft YaHei", 16), justify="center",
+                               font=("BCU DongHui", 16), justify="center",
                                foreground="#333333", state="readonly")
         # 通过padding增加高度
         input_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, ipadx=10, ipady=15)
