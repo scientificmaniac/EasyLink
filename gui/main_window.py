@@ -796,7 +796,7 @@ class AboutDialog:
         
         # 版权信息
         copyright_label = ttk.Label(main_frame, text="© 2025 EasyLink. All rights reserved.", 
-                                 font=("Microsoft YaHei", 9), 
+                                 font=("BCU DONGHUI", 9),
                                  foreground="#999999")
         copyright_label.pack(pady=(10, 0))
         
