@@ -108,6 +108,3 @@ contact_management.py
 - 数据存储：JSON
 - Excel处理：openpyxl
 
-## 作者
-
-北京城市学院信息学部24计本1/2班 课程设计
