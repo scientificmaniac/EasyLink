@@ -312,13 +312,13 @@ class ContactGUI:
         self.root.configure(bg="#f5f5f5")
         
         # 标签样式
-        self.style.configure("TLabel", background="#f5f5f5", foreground="#333333", font=("Microsoft YaHei", 10))
+        self.style.configure("TLabel", background="#f5f5f5", foreground="#333333", font=("BCU DongHui", 10))
         
         # 按钮样式
         self.style.configure("TButton", 
                            background="#4a90e2", 
                            foreground="white", 
-                           font=("Microsoft YaHei", 10),
+                           font=("BCU DongHui", 10),
                            padding=6)
         self.style.map("TButton", 
                       background=[("active", "#357abd"), ("disabled", "#d9d9d9")],
@@ -329,13 +329,13 @@ class ContactGUI:
                            fieldbackground="white", 
                            foreground="#333333",
                            padding=5,
-                           font=("Microsoft YaHei", 10))
+                           font=("BCU DongHui", 10))
         
         # 列表框样式
         self.style.configure("Listbox", 
                            background="white", 
                            foreground="#333333",
-                           font=("Microsoft YaHei", 10))
+                           font=("BCU DongHui", 10))
         
         # 标签页样式
         self.style.configure("TNotebook", background="#f5f5f5")
@@ -343,7 +343,7 @@ class ContactGUI:
                            background="#e0e0e0", 
                            foreground="#333333",
                            padding=[15, 5],
-                           font=("Microsoft YaHei", 10))
+                           font=("BCU DongHui", 10))
         self.style.map("TNotebook.Tab", 
                       background=[("selected", "white")],
                       foreground=[("selected", "#4a90e2")])
@@ -352,11 +352,11 @@ class ContactGUI:
         self.style.configure("TLabelframe", 
                            background="#f5f5f5",
                            foreground="#333333",
-                           font=("Microsoft YaHei", 11, "bold"))
+                           font=("BCU DongHui", 11, "bold"))
         self.style.configure("TLabelframe.Label", 
                            background="#f5f5f5",
                            foreground="#333333",
-                           font=("Microsoft YaHei", 11, "bold"))
+                           font=("BCU DongHui", 11, "bold"))
 
     def setup_ui(self):
         # 创建主框架
@@ -365,7 +365,7 @@ class ContactGUI:
 
         # 标题
         title_label = ttk.Label(main_frame, text="个人通讯录管理系统", 
-                               font=("Microsoft YaHei", 16, "bold"), 
+                               font=("BCU DongHui", 16, "bold"), 
                                foreground="#4a90e2")
         title_label.pack(pady=(0, 15))
 
@@ -377,7 +377,7 @@ class ContactGUI:
         search_frame = ttk.Frame(top_frame)
         search_frame.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
-        ttk.Label(search_frame, text="搜索:", font=("Microsoft YaHei", 10)).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Label(search_frame, text="搜索:", font=("BCU DongHui", 10)).pack(side=tk.LEFT, padx=(0, 5))
         self.search_var = tk.StringVar()
         search_entry = ttk.Entry(search_frame, textvariable=self.search_var, width=40)
         search_entry.pack(side=tk.LEFT, padx=(0, 10), fill=tk.X, expand=True)
@@ -522,7 +522,7 @@ class ContactGUI:
         
         # 标题
         title_label = ttk.Label(keypad_frame, text="九键拨号搜索", 
-                               font=("Microsoft YaHei", 14, "bold"), 
+                               font=("BCU DongHui", 14, "bold"), 
                                foreground="#4a90e2")
         title_label.pack(pady=(0, 20))
         
@@ -536,7 +536,7 @@ class ContactGUI:
         
         self.keypad_input_var = tk.StringVar()
         input_entry = ttk.Entry(input_container, textvariable=self.keypad_input_var, 
-                               font=("Microsoft YaHei", 16), justify="center",
+                               font=("BCU DongHui", 16), justify="center",
                                foreground="#333333", state="readonly")
         # 通过padding增加高度
         input_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, ipadx=10, ipady=15)
@@ -550,7 +550,7 @@ class ContactGUI:
         # 搜索结果提示
         self.keypad_result_var = tk.StringVar(value="请使用下方拨号键盘输入数字")
         result_label = ttk.Label(keypad_frame, textvariable=self.keypad_result_var, 
-                                font=("Microsoft YaHei", 10), 
+                                font=("BCU DongHui", 10), 
                                 foreground="#666666")
         result_label.pack(pady=(0, 20))
         
@@ -627,7 +627,7 @@ class ContactGUI:
         
         # 配置keypad按钮样式 - 确保多行文本正确显示，适应不同分辨率
         self.style.configure("Keypad.TButton", 
-                           font=("Microsoft YaHei", 14, "bold"),
+                           font=("BCU DongHui", 14, "bold"),
                            padding=15,  # 调整内边距，为字母提示留出空间
                            # 移除固定宽度，让按钮根据网格自适应
                            justify="center",
@@ -640,7 +640,7 @@ class ContactGUI:
         
         # 配置清除按钮样式
         self.style.configure("KeypadClear.TButton", 
-                           font=("Microsoft YaHei", 18, "bold"),
+                           font=("BCU DongHui", 18, "bold"),
                            foreground="#ff6b6b",
                            background="#f5f5f5",
                            borderwidth=1,
