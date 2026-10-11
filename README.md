@@ -175,6 +175,10 @@ pyinstaller EasyLink.spec
 
 产物位于 `dist/`，构建中间文件位于 `build/`，两者均已在 `.gitignore` 中忽略。
 
+`pypinyin`（约 3 MB 拼音词典）与 `openpyxl` 都自带 PyInstaller hook，其数据文件会在
+打包时被自动收集，无需在 `EasyLink.spec` 中额外配置。若打包后的程序中文九键搜索失效，
+请检查 `dist/` 内是否缺少 `pypinyin/phrases_dict.json`。
+
 ## 许可证
 
 本项目基于 [MIT License](LICENSE) 开源。
