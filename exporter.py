@@ -180,7 +180,7 @@ class TXTExporter(BaseExporter):
                 logger.warning("跳过非 Contact 对象: %r", skipped)
 
             with open(file_path, "w", encoding="utf-8") as f:
-                f.write("个人通讯录\n")
+                f.write("EasyLink 通讯录\n")
                 f.write("=" * 50 + "\n\n")
 
                 for i, contact in enumerate(valid, 1):
@@ -222,7 +222,7 @@ class MDExporter(BaseExporter):
                 logger.warning("跳过非 Contact 对象: %r", skipped)
 
             with open(file_path, "w", encoding="utf-8") as f:
-                f.write("# 个人通讯录\n\n")
+                f.write("# EasyLink 通讯录\n\n")
                 f.write("| 姓名 | 电话 | 邮箱 | 国家/地区 | 备注 | 常用联系人 |\n")
                 f.write("|------|------|------|------------|------|------------|\n")
 

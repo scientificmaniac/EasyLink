@@ -1,4 +1,4 @@
-# EasyLink · 个人通讯录管理系统
+# EasyLink
 
 一个基于 **Python + Tkinter** 的桌面通讯录工具，支持联系人增删改查、常用标记、统一搜索、
 九键拨号搜索，以及 Excel / TXT / Markdown / JSON 四种格式的导入导出。

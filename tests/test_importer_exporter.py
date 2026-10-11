@@ -96,7 +96,7 @@ class TestTxtRoundTrip(RoundTripMixin, unittest.TestCase):
     def test_incomplete_record_is_skipped(self):
         path = os.path.join(self.tmp.name, "partial.txt")
         Path(path).write_text(
-            "个人通讯录\n\n联系人 1:\n姓名: 只有姓名\n\n联系人 2:\n姓名: 张三\n电话: 13800138000\n",
+            "EasyLink 通讯录\n\n联系人 1:\n姓名: 只有姓名\n\n联系人 2:\n姓名: 张三\n电话: 13800138000\n",
             encoding="utf-8",
         )
         ok, restored = TXTImporter.import_from_txt(path)
@@ -278,7 +278,7 @@ class TestDataImporterEndToEnd(unittest.TestCase):
 
     def test_empty_source_file_warns(self):
         empty = os.path.join(self.tmp.name, "empty.txt")
-        Path(empty).write_text("个人通讯录\n", encoding="utf-8")
+        Path(empty).write_text("EasyLink 通讯录\n", encoding="utf-8")
 
         notifier = NotifierSpy()
         self.assertFalse(DataImporter.import_contacts(empty, self.manager, notifier=notifier))
