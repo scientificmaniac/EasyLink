@@ -52,26 +52,32 @@ python main.py
 
 ## 项目结构
 
-```
-EasyLink/
-├── main.py               # 程序入口：日志配置、JSON→SQLite 迁移、启动窗口
-├── contact.py            # Contact 数据模型、国家区号表、九键映射表
-├── pinyin.py             # 汉字拼音支持（基于 pypinyin，含姓氏异读表）
-├── validator.py          # 各字段的校验规则
-├── storage.py            # StorageBase / DataStorage(JSON) / SQLiteStorage
-├── contact_manager.py    # 业务逻辑：增删改查、搜索索引、批量导入
-├── importer.py           # Excel / TXT / Markdown / JSON 导入
-├── exporter.py           # Excel / TXT / Markdown 导出
-├── notifier.py           # 数据层 → 界面层的通知回调抽象
-├── gui/
-│   ├── main_window.py    # 主窗口：列表、详情面板、导入导出入口
-│   ├── dialogs.py        # 添加 / 修改联系人对话框
-│   └── keypad.py         # 九键拨号搜索页
-├── tests/                # 单元测试
-├── contacts.json         # 示例数据，首次运行时迁移到数据库
-├── requirements.txt
-├── EasyLink.spec         # PyInstaller 打包配置
-└── README.md
+```mermaid
+flowchart TB
+    subgraph GUI["gui/ · 界面层"]
+        MW["main_window.py<br/>主窗口：列表、详情面板、导入导出入口"]
+        DLG["dialogs.py<br/>添加 / 修改联系人对话框"]
+        KP["keypad.py<br/>九键拨号搜索页"]
+    end
+
+    subgraph CORE["核心模块 · 扁平放置，便于直接运行"]
+        MAIN["main.py<br/>程序入口：日志配置、JSON → SQLite 迁移、启动窗口"]
+        CM["contact_manager.py<br/>业务逻辑：增删改查、搜索索引、批量导入"]
+        ST["storage.py<br/>StorageBase · DataStorage · SQLiteStorage"]
+        IMP["importer.py<br/>Excel / TXT / Markdown / JSON 导入"]
+        EXP["exporter.py<br/>Excel / TXT / Markdown 导出"]
+        CT["contact.py<br/>Contact 数据模型、国家区号表、九键映射表"]
+        PY["pinyin.py<br/>汉字拼音支持（含姓氏异读表）"]
+        VD["validator.py<br/>各字段的校验规则"]
+        NT["notifier.py<br/>数据层 → 界面层的通知回调抽象"]
+    end
+
+    subgraph SUPPORT["工程化支撑"]
+        TST["tests/<br/>单元测试"]
+        REQ["requirements.txt<br/>openpyxl · pypinyin（均为可选依赖）"]
+        SPEC["EasyLink.spec<br/>PyInstaller 打包配置"]
+        DATA["contacts.json<br/>示例数据，首次运行时迁移到数据库"]
+    end
 ```
 
 ## 数据文件
@@ -150,12 +156,74 @@ python -m unittest discover -s tests -t . -v
 
 ### 分层与依赖方向
 
+```mermaid
+flowchart TD
+    subgraph L0["入口"]
+        MAIN["main.py"]
+    end
+
+    subgraph L1["界面层 · gui/"]
+        MW["main_window.py"]
+        DLG["dialogs.py"]
+        KP["keypad.py"]
+    end
+
+    subgraph L2["业务层"]
+        CM["contact_manager.py"]
+    end
+
+    subgraph L3["数据层"]
+        ST["storage.py"]
+        IMP["importer.py"]
+        EXP["exporter.py"]
+    end
+
+    subgraph L4["基础层"]
+        CT["contact.py"]
+        PY["pinyin.py"]
+        VD["validator.py"]
+        NT["notifier.py"]
+    end
+
+    MAIN --> MW
+    MAIN --> CM
+    MAIN --> ST
+
+    MW --> CT
+    MW --> IMP
+    MW --> EXP
+    MW --> DLG
+    MW --> KP
+    MW --> NT
+
+    DLG --> CT
+    DLG --> VD
+
+    KP --> CT
+    KP --> DLG
+
+    CM --> CT
+    CM --> PY
+    CM --> ST
+
+    ST --> CT
+
+    IMP --> CT
+    IMP --> VD
+    IMP --> NT
+
+    EXP --> CT
+    EXP --> NT
+
+    CT --> VD
+
+    MW -.->|注入 ContactManager| CM
+    KP -.->|注入 ContactManager| CM
 ```
-gui  ──►  contact_manager  ──►  storage  ──►  contact  ──►  validator
- │                │
- │                └──►  pinyin
- └──►  importer / exporter  ──►  notifier
-```
+
+图中**实线**表示 `import` 依赖，**虚线**表示通过构造函数注入的运行时依赖
+（`main.py` 创建 `ContactManager` 后传给界面层，界面层并不 `import` 它）。
+所有箭头方向一致向下，不存在下层反向依赖上层的情况。
 
 - **数据层（`importer` / `exporter`）不导入 `tkinter`**：面向用户的提示通过
   `notifier` 回调交给界面层，因此这些模块可以在命令行或测试中直接使用
