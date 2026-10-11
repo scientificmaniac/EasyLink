@@ -1,0 +1,10 @@
+# EasyLink 运行依赖
+#
+# 图形界面使用标准库 tkinter，无需额外安装（Windows / macOS 官方 Python 已内置；
+# 部分 Linux 发行版需要单独安装 python3-tk）。
+#
+# 下列依赖缺失时程序仍可正常启动，仅对应功能不可用：
+#   openpyxl  -> Excel 导入 / 导出
+#   pypinyin  -> 中文姓名的九键搜索（英文姓名不受影响）
+openpyxl>=3.0.0
+pypinyin>=0.49.0
