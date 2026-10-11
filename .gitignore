@@ -52,3 +52,6 @@ contacts.json.*.bak
 # 日志
 *.log
 logs/
+
+# 本地文档预览产物（渲染 Mermaid 图用，可随时删除）
+.mermaid-preview/

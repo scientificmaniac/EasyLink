@@ -158,73 +158,32 @@ python -m unittest discover -s tests -t . -v
 
 ```mermaid
 flowchart TD
-    subgraph L0["入口"]
-        MAIN["main.py"]
-    end
+    L0["入口<br/>main.py"]
+    L1["界面层<br/>gui/ — main_window · dialogs · keypad"]
+    L2["业务层<br/>contact_manager"]
+    L3["数据层<br/>storage · importer · exporter"]
+    L4["基础层<br/>contact · pinyin · validator · notifier"]
 
-    subgraph L1["界面层 · gui/"]
-        MW["main_window.py"]
-        DLG["dialogs.py"]
-        KP["keypad.py"]
-    end
+    L0 --> L1
+    L0 --> L2
+    L0 --> L3
 
-    subgraph L2["业务层"]
-        CM["contact_manager.py"]
-    end
+    L1 -.->|注入 ContactManager| L2
+    L1 --> L3
+    L1 --> L4
 
-    subgraph L3["数据层"]
-        ST["storage.py"]
-        IMP["importer.py"]
-        EXP["exporter.py"]
-    end
+    L2 --> L3
+    L2 --> L4
 
-    subgraph L4["基础层"]
-        CT["contact.py"]
-        PY["pinyin.py"]
-        VD["validator.py"]
-        NT["notifier.py"]
-    end
-
-    MAIN --> MW
-    MAIN --> CM
-    MAIN --> ST
-
-    MW --> CT
-    MW --> IMP
-    MW --> EXP
-    MW --> DLG
-    MW --> KP
-    MW --> NT
-
-    DLG --> CT
-    DLG --> VD
-
-    KP --> CT
-    KP --> DLG
-
-    CM --> CT
-    CM --> PY
-    CM --> ST
-
-    ST --> CT
-
-    IMP --> CT
-    IMP --> VD
-    IMP --> NT
-
-    EXP --> CT
-    EXP --> NT
-
-    CT --> VD
-
-    MW -.->|注入 ContactManager| CM
-    KP -.->|注入 ContactManager| CM
+    L3 --> L4
 ```
 
-图中**实线**表示 `import` 依赖，**虚线**表示通过构造函数注入的运行时依赖
-（`main.py` 创建 `ContactManager` 后传给界面层，界面层并不 `import` 它）。
-所有箭头方向一致向下，不存在下层反向依赖上层的情况。
+图中每个节点代表一层，节点内列出该层的模块；**实线**为 `import` 依赖，
+**虚线**为通过构造函数注入的运行时依赖（`main.py` 创建 `ContactManager` 后
+传给界面层，界面层并不 `import` 它）。所有箭头一致指向下层，不存在反向依赖。
 
+- **基础层不依赖任何上层**：`contact` / `pinyin` / `validator` / `notifier`
+  只依赖同层或更底层模块，因此可以脱离 GUI 与数据库单独测试
 - **数据层（`importer` / `exporter`）不导入 `tkinter`**：面向用户的提示通过
   `notifier` 回调交给界面层，因此这些模块可以在命令行或测试中直接使用
 - **`openpyxl` / `pypinyin` 均采用惰性导入**：缺失时不影响程序启动与其它功能，
