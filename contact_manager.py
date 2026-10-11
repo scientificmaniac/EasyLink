@@ -22,6 +22,7 @@
 import logging
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
+import pinyin
 from contact import LETTER_TO_KEY, Contact
 from storage import StorageBase
 
@@ -63,7 +64,7 @@ class ContactManager:
     def _rebuild_search_cache(self) -> None:
         """重建搜索索引
 
-        为每个联系人预计算小写姓名和九键编码，避免每次搜索都重复计算。
+        为每个联系人预计算小写姓名、邮箱与九键编码，避免每次搜索都重复计算。
         """
         self._search_cache = [
             {
@@ -71,7 +72,10 @@ class ContactManager:
                 "name_lower": contact.name.lower(),
                 "phone": contact.phone,
                 "email_lower": contact.email.lower(),
-                "keypad_code": self.convert_to_keypad_code(contact.name.lower()),
+                # 拼音字母序列，用于支持「直接输入拼音搜中文姓名」
+                "letters": pinyin.to_letters(contact.name),
+                # 可能包含多个候选：姓氏存在异读时会同时保留两种读音的编码
+                "keypad_codes": self._build_keypad_codes(contact.name),
             }
             for contact in self.storage.contacts
         ]
@@ -88,7 +92,8 @@ class ContactManager:
     def convert_to_keypad_code(text: str) -> str:
         """将文本转换为九键键盘数字序列
 
-        仅对拉丁字母有效：中文等非字母字符会被跳过，因此纯中文姓名会得到空串。
+        拉丁字母按 a-z -> 2-9 直接映射；汉字先经 pinyin 转成拼音，再按拼音字母映射。
+        未安装 pypinyin 时汉字会被跳过，英文姓名不受影响。
 
         Args:
             text: 要转换的文本
@@ -102,7 +107,45 @@ class ContactManager:
         if not isinstance(text, str):
             raise TypeError("text must be a string")
 
-        return "".join(LETTER_TO_KEY.get(char, "") for char in text if char.isalpha())
+        return "".join(LETTER_TO_KEY.get(char, "") for char in pinyin.to_letters(text))
+
+    @staticmethod
+    def _syllable_code(syllable: str) -> str:
+        """把拼音音节转换成九键数字
+
+        Args:
+            syllable: 不带声调的拼音音节，如 "shan"
+
+        Returns:
+            str: 九键数字序列
+        """
+        return "".join(LETTER_TO_KEY.get(char, "") for char in syllable)
+
+    def _build_keypad_codes(self, name: str) -> Tuple[str, ...]:
+        """生成某个姓名对应的全部九键编码候选
+
+        姓氏异读（如「单」作姓氏读 shàn，常用读音却是 dān）会让两种读音的编码
+        完全不同。这里同时保留两套编码，用户按任一种读音输入都能检索到。
+
+        Args:
+            name: 联系人姓名
+
+        Returns:
+            Tuple[str, ...]: 去重后的编码候选；无法编码时返回空元组
+        """
+        primary = self.convert_to_keypad_code(name)
+
+        if not name:
+            return (primary,) if primary else ()
+
+        alternate_reading = pinyin.surname_reading(name[0])
+        if not alternate_reading:
+            return (primary,)
+
+        alternate = self._syllable_code(alternate_reading) + self.convert_to_keypad_code(name[1:])
+        if alternate == primary:
+            return (primary,)
+        return (primary, alternate)
 
     # ------------------------------------------------------------------
     # 增删改
@@ -347,8 +390,8 @@ class ContactManager:
         采用前缀匹配而非任意位置的子串匹配：九键输入是逐位收窄的过程，
         若用子串匹配，输入单个 "9" 会命中编码中段含 9 的全部联系人。
 
-        仅对拉丁字母姓名有效：中文姓名没有对应的拉丁字母编码，九键编码为空串，
-        因此不会被任何数字序列命中。
+        中文姓名按拼音编码参与匹配（如「张明」-> zhangming -> 942646464），
+        这需要安装 pypinyin；未安装时只有拉丁字母姓名能命中。
 
         Args:
             keypad_code: 九键键盘数字序列
@@ -370,13 +413,20 @@ class ContactManager:
         results = [
             item["contact"]
             for item in self._search_cache
-            if item["keypad_code"].startswith(keypad_code)
+            if any(code.startswith(keypad_code) for code in item["keypad_codes"])
         ]
         logger.debug("九键搜索 '%s' 命中 %d 条", keypad_code, len(results))
         return results
 
     def search_all(self, keyword: str) -> List[Contact]:
-        """统一搜索：一次遍历同时匹配姓名、电话、邮箱和九键编码
+        """统一搜索：一次遍历同时匹配姓名、拼音、电话、邮箱和九键编码
+
+        支持的输入形式：
+        - 中文或英文姓名的子串，如「张」「emma」
+        - 姓名对应的拼音子串，如「zhang」「zhangming」
+        - 电话号码子串
+        - 邮箱子串
+        - 九键数字序列（前缀匹配），如「942646464」
 
         Args:
             keyword: 搜索关键词
@@ -401,7 +451,8 @@ class ContactManager:
                 keyword_lower in item["name_lower"]
                 or keyword in item["phone"]
                 or (item["email_lower"] and keyword_lower in item["email_lower"])
-                or (is_digits and item["keypad_code"].startswith(keyword))
+                or (item["letters"] and keyword_lower in item["letters"])
+                or (is_digits and any(code.startswith(keyword) for code in item["keypad_codes"]))
             ):
                 results.append(item["contact"])
         return results

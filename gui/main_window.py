@@ -502,7 +502,7 @@ class ContactGUI:
     # 搜索
     # ------------------------------------------------------------------
     def unified_search(self, event=None):
-        """统一搜索：一次匹配姓名、电话、邮箱与九键编码"""
+        """统一搜索：一次匹配姓名、拼音、电话、邮箱与九键数字编码"""
         search_term = self.search_var.get().strip()
         if not search_term:
             messagebox.showwarning("警告", "请输入搜索关键词")
@@ -616,7 +616,7 @@ class AboutDialog:
                   font=(_FONT_FAMILY, 18, "bold"),
                   foreground="#4a90e2").pack(pady=(0, 15))
 
-        ttk.Label(main_frame, text="版本 2.0.0",
+        ttk.Label(main_frame, text="版本 2.1.0",
                   font=(_FONT_FAMILY, 12),
                   foreground="#666666").pack(pady=(0, 10))
 
@@ -632,8 +632,8 @@ class AboutDialog:
             "主要功能：\n"
             "✓ 联系人的添加、修改、删除\n"
             "✓ 常用联系人标记\n"
-            "✓ 统一搜索（姓名、电话、邮箱、九键编码）\n"
-            "✓ 九键拨号搜索\n"
+            "✓ 统一搜索（姓名、拼音、电话、邮箱）\n"
+            "✓ 九键拨号搜索（支持中文拼音）\n"
             "✓ 数据导入导出（Excel、TXT、Markdown、JSON）\n"
             "✓ 美观易用的用户界面\n"
             "✓ 数据自动保存\n"

@@ -178,18 +178,44 @@ class TestContactManager(unittest.TestCase):
         self.assertEqual([c.name for c in self.manager.search_by_keypad("328")], ["David Wang"])
         # Emma Wilson -> "3662945766"
         self.assertEqual([c.name for c in self.manager.search_by_keypad("36")], ["Emma Wilson"])
-        # 没有任何人的九键编码以 9 开头
-        self.assertEqual(self.manager.search_by_keypad("9"), [])
+        # 张明 -> "942646464"，只有它以 9 开头
+        self.assertEqual([c.name for c in self.manager.search_by_keypad("9")], ["张明"])
 
     def test_keypad_search_rejects_non_digits(self):
         with self.assertRaises(ValueError):
             self.manager.search_by_keypad("abc")
 
-    def test_keypad_code_for_chinese_name_is_empty(self):
-        """中文姓名没有拉丁编码，九键搜索不应误命中它们"""
+    def test_keypad_code_for_chinese_name_uses_pinyin(self):
+        """中文姓名按其拼音编码参与九键搜索"""
         self.seed()
-        self.assertEqual(self.manager.convert_to_keypad_code("张明"), "")
-        self.assertEqual(self.manager.search_by_keypad("364"), [])
+        self.assertEqual(self.manager.convert_to_keypad_code("张明"), "942646464")
+        self.assertEqual(self.manager.convert_to_keypad_code("李四"), "5474")
+        self.assertEqual(self.manager.convert_to_keypad_code("Emma Wilson"), "3662945766")
+        self.assertEqual(self.manager.convert_to_keypad_code(""), "")
+
+    def test_keypad_search_finds_chinese_names(self):
+        """中文姓名可被逐位收窄的九键输入检索到"""
+        self.seed()
+        for keyword in ("9", "94", "942", "94264", "942646464"):
+            with self.subTest(keyword=keyword):
+                self.assertEqual(
+                    [c.name for c in self.manager.search_by_keypad(keyword)], ["张明"]
+                )
+        self.assertEqual([c.name for c in self.manager.search_by_keypad("5474")], ["李四"])
+
+    def test_keypad_search_finds_alternate_surname_reading(self):
+        """姓氏异读：单(shàn) 按姓氏读音与常用读音都应能搜到"""
+        self.manager.add_contact(Contact("单雄信", "13700137000"))
+        # 姓氏读音 shan -> 7426
+        self.assertEqual([c.name for c in self.manager.search_by_keypad("7426")], ["单雄信"])
+        # 常用读音 dan -> 326
+        self.assertEqual([c.name for c in self.manager.search_by_keypad("326")], ["单雄信"])
+
+    def test_search_all_matches_pinyin(self):
+        """统一搜索支持直接输入拼音"""
+        self.seed()
+        self.assertEqual([c.name for c in self.manager.search_all("lisi")], ["李四"])
+        self.assertEqual([c.name for c in self.manager.search_all("zhangming")], ["张明"])
 
     def test_search_all_combines_sources_without_duplicates(self):
         self.seed()
