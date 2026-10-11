@@ -1,0 +1,5 @@
+# EasyLink 运行依赖
+#
+# 图形界面使用标准库 tkinter，无需额外安装（Windows / macOS 官方 Python 已内置；
+# 部分 Linux 发行版需要单独安装 python3-tk）。
+openpyxl>=3.0.0

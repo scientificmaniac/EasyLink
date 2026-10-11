@@ -1,180 +1,444 @@
-from typing import List, Dict, Any, Optional, Tuple
-import logging
-from contact import LETTER_TO_KEY
-from contact import Contact
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+联系人管理器模块
 
-# 配置日志
+该模块提供联系人管理的核心业务逻辑，包括联系人的添加、修改、删除、搜索等功能，
+以及搜索所需索引的预计算与维护。
+
+主要功能：
+1. 联系人的增删改查
+2. 多种搜索方式（姓名、电话、邮箱、九键搜索）
+3. 搜索索引预计算，提高搜索效率
+4. 批量导入，避免重复重建索引
+5. 常用联系人管理
+
+设计说明：
+    self._search_cache 是 storage.contacts 的派生索引。任何会改动联系人集合
+    的操作都必须调用 _rebuild_search_cache()，否则搜索与「常用联系人」页会
+    返回过期结果。
+"""
+
+import logging
+from typing import Any, Dict, Iterable, List, Optional, Tuple
+
+from contact import LETTER_TO_KEY, Contact
+from storage import StorageBase
+
 logger = logging.getLogger(__name__)
 
+
 class ContactManager:
-    def __init__(self, storage):
-        """初始化联系人管理器"""
+    """联系人管理器类
+
+    该类负责联系人的核心业务逻辑，包括添加、修改、删除、搜索等功能。
+
+    属性：
+        storage: 数据存储对象
+        _search_cache: 搜索索引，用于提高搜索效率
+    """
+
+    def __init__(self, storage: StorageBase) -> None:
+        """初始化联系人管理器
+
+        Args:
+            storage: 数据存储对象
+
+        Raises:
+            ValueError: 如果 storage 为 None
+            TypeError: 如果 storage 不是 StorageBase 的实例
+        """
         if storage is None:
             raise ValueError("storage cannot be None")
-        if not hasattr(storage, 'contacts') or not hasattr(storage, 'save_contacts'):
-            raise TypeError("storage must have contacts attribute and save_contacts method")
-        
-        self.storage = storage
-        # 预计算并缓存搜索所需的小写名称，提高搜索效率
-        self._search_cache: List[Dict[str, Any]] = []
-        self._precompute_search_cache()
+        if not isinstance(storage, StorageBase):
+            raise TypeError("storage must be an instance of StorageBase")
 
-    def _precompute_search_cache(self) -> None:
-        """预计算搜索缓存，提高搜索效率"""
-        self._search_cache.clear()
-        
-        for contact in self.storage.contacts:
-            name_lower = contact.name.lower()
-            self._search_cache.append({
-                'contact': contact,
-                'name_lower': name_lower,
-                'phone': contact.phone,
-                'keypad_code': self.convert_to_keypad_code(name_lower)
-            })
-        
-        logger.info(f"Search cache updated with {len(self._search_cache)} contacts")
-    
-    def convert_to_keypad_code(self, text: str) -> str:
-        """将文本转换为九键键盘数字序列（公开方法）"""
+        self.storage: StorageBase = storage
+        self._search_cache: List[Dict[str, Any]] = []
+        self._rebuild_search_cache()
+
+    # ------------------------------------------------------------------
+    # 搜索索引
+    # ------------------------------------------------------------------
+    def _rebuild_search_cache(self) -> None:
+        """重建搜索索引
+
+        为每个联系人预计算小写姓名和九键编码，避免每次搜索都重复计算。
+        """
+        self._search_cache = [
+            {
+                "contact": contact,
+                "name_lower": contact.name.lower(),
+                "phone": contact.phone,
+                "email_lower": contact.email.lower(),
+                "keypad_code": self.convert_to_keypad_code(contact.name.lower()),
+            }
+            for contact in self.storage.contacts
+        ]
+        logger.debug("搜索索引已更新，共 %d 条", len(self._search_cache))
+
+    def refresh_cache(self) -> None:
+        """对外暴露的索引刷新入口
+
+        当调用方绕过本管理器直接改动 storage.contacts 后，应调用此方法恢复一致性。
+        """
+        self._rebuild_search_cache()
+
+    @staticmethod
+    def convert_to_keypad_code(text: str) -> str:
+        """将文本转换为九键键盘数字序列
+
+        仅对拉丁字母有效：中文等非字母字符会被跳过，因此纯中文姓名会得到空串。
+
+        Args:
+            text: 要转换的文本
+
+        Returns:
+            str: 九键键盘数字序列
+
+        Raises:
+            TypeError: 如果 text 不是字符串
+        """
         if not isinstance(text, str):
             raise TypeError("text must be a string")
-        
-        keypad_code = []
-        for char in text:
-            if char.isalpha():
-                keypad_code.append(LETTER_TO_KEY.get(char, ''))
-            # 非字母字符跳过
-        return ''.join(keypad_code)
 
-    def add_contact(self, contact: Contact) -> tuple[bool, str]:
-        """添加联系人"""
+        return "".join(LETTER_TO_KEY.get(char, "") for char in text if char.isalpha())
+
+    # ------------------------------------------------------------------
+    # 增删改
+    # ------------------------------------------------------------------
+    def add_contact(self, contact: Contact) -> Tuple[bool, str]:
+        """添加单个联系人
+
+        Args:
+            contact: 要添加的联系人对象
+
+        Returns:
+            Tuple[bool, str]: (操作结果, 结果消息)
+
+        Raises:
+            TypeError: 如果 contact 不是 Contact 实例
+        """
         if not isinstance(contact, Contact):
             raise TypeError("contact must be an instance of Contact")
-        
-        # 检查电话号码是否已存在
-        existing_contact = self.storage.get_contact_by_phone(contact.phone)
-        if existing_contact:
-            logger.warning(f"Attempt to add duplicate contact with phone: {contact.phone}")
+
+        if self.storage.get_contact_by_phone(contact.phone) is not None:
+            logger.warning("尝试添加重复电话号码: %s", contact.phone)
             return False, "该电话号码已存在"
-        
-        try:
-            self.storage.contacts.append(contact)
-            self._precompute_search_cache()  # 更新缓存
-            self.storage.save_contacts()
-            logger.info(f"Contact added successfully: {contact.name} ({contact.phone})")
-            return True, "添加成功"
-        except Exception as e:
-            logger.error(f"Failed to add contact: {e}", exc_info=True)
-            return False, f"添加失败: {str(e)}"
 
-    def update_contact(self, index: int, contact: Contact) -> tuple[bool, str]:
-        """更新联系人"""
+        try:
+            self.storage.add_contact(contact)
+        except ValueError as e:
+            logger.warning("添加联系人失败: %s", e)
+            return False, str(e)
+        except Exception as e:
+            logger.error("添加联系人失败: %s", e, exc_info=True)
+            return False, f"添加失败: {e}"
+
+        self._rebuild_search_cache()
+        logger.info("联系人添加成功: %s (%s)", contact.name, contact.phone)
+        return True, "添加成功"
+
+    def add_contacts(self, contacts: Iterable[Contact]) -> Tuple[int, int]:
+        """批量添加联系人（导入场景专用）
+
+        与逐个调用 add_contact 相比，本方法在内存中去重、只落盘一次、
+        只重建一次搜索索引，把导入 N 条数据的开销从 O(N²) 降为 O(N)。
+
+        Args:
+            contacts: 待添加的联系人集合
+
+        Returns:
+            Tuple[int, int]: (成功导入数量, 被跳过的数量)
+
+        Raises:
+            TypeError: 如果 contacts 中混入非 Contact 对象
+        """
+        existing_phones = {c.phone for c in self.storage.contacts}
+        accepted: List[Contact] = []
+        skipped = 0
+
+        for contact in contacts:
+            if not isinstance(contact, Contact):
+                raise TypeError("contacts must contain Contact instances only")
+            if contact.phone in existing_phones:
+                logger.warning("导入时跳过重复电话号码: %s", contact.phone)
+                skipped += 1
+                continue
+            existing_phones.add(contact.phone)
+            accepted.append(contact)
+
+        if not accepted:
+            logger.info("批量导入: 没有新增联系人，跳过 %d 条", skipped)
+            return 0, skipped
+
+        self.storage.add_contacts(accepted)
+        self._rebuild_search_cache()
+        logger.info("批量导入完成: 新增 %d 条，跳过 %d 条", len(accepted), skipped)
+        return len(accepted), skipped
+
+    def update_contact(self, index: int, contact: Contact) -> Tuple[bool, str]:
+        """更新指定索引处的联系人
+
+        Args:
+            index: 要更新的联系人索引
+            contact: 新的联系人对象
+
+        Returns:
+            Tuple[bool, str]: (操作结果, 结果消息)
+
+        Raises:
+            TypeError: 如果 contact 不是 Contact 实例
+            IndexError: 如果索引无效
+        """
         if not isinstance(contact, Contact):
             raise TypeError("contact must be an instance of Contact")
-        
         if not 0 <= index < len(self.storage.contacts):
             raise IndexError("Invalid contact index")
-        
-        # 检查电话号码是否被其他联系人使用
-        existing_contact = self.storage.get_contact_by_phone(contact.phone)
-        if existing_contact and self.storage.contacts.index(existing_contact) != index:
-            logger.warning(f"Attempt to update contact with duplicate phone: {contact.phone}")
+
+        # 电话号码是否被「别的」联系人占用（按对象身份比较，意图明确）
+        existing = self.storage.get_contact_by_phone(contact.phone)
+        if existing is not None and existing is not self.storage.contacts[index]:
+            logger.warning("尝试把电话号码改为已被占用的 %s", contact.phone)
             return False, "该电话号码已被其他联系人使用"
-        
-        try:
-            old_contact = self.storage.contacts[index]
-            self.storage.contacts[index] = contact
-            self._precompute_search_cache()  # 更新缓存
-            self.storage.save_contacts()
-            logger.info(f"Contact updated successfully: {old_contact.name} -> {contact.name} ({contact.phone})")
-            return True, "更新成功"
-        except Exception as e:
-            logger.error(f"Failed to update contact at index {index}: {e}", exc_info=True)
-            return False, f"更新失败: {str(e)}"
 
-    def delete_contact(self, index: int) -> tuple[bool, str]:
-        """删除联系人"""
+        old_contact = self.storage.contacts[index]
+        try:
+            self.storage.update_contact(index, contact)
+        except ValueError as e:
+            logger.warning("更新联系人失败: %s", e)
+            return False, str(e)
+        except Exception as e:
+            logger.error("更新索引 %d 处的联系人失败: %s", index, e, exc_info=True)
+            return False, f"更新失败: {e}"
+
+        self._rebuild_search_cache()
+        logger.info("联系人更新成功: %s -> %s (%s)", old_contact.name, contact.name, contact.phone)
+        return True, "更新成功"
+
+    def delete_contact(self, index: int) -> Tuple[bool, str]:
+        """删除指定索引处的联系人
+
+        Args:
+            index: 要删除的联系人索引
+
+        Returns:
+            Tuple[bool, str]: (操作结果, 结果消息)
+
+        Raises:
+            IndexError: 如果索引无效
+        """
         if not 0 <= index < len(self.storage.contacts):
             raise IndexError("Invalid contact index")
-        
-        try:
-            deleted_contact = self.storage.contacts.pop(index)
-            self._precompute_search_cache()  # 更新缓存
-            self.storage.save_contacts()
-            logger.info(f"Contact deleted successfully: {deleted_contact.name} ({deleted_contact.phone})")
-            return True, "删除成功"
-        except Exception as e:
-            logger.error(f"Failed to delete contact at index {index}: {e}", exc_info=True)
-            return False, f"删除失败: {str(e)}"
 
+        deleted_contact = self.storage.contacts[index]
+        try:
+            self.storage.delete_contact(index)
+        except Exception as e:
+            logger.error("删除索引 %d 处的联系人失败: %s", index, e, exc_info=True)
+            return False, f"删除失败: {e}"
+
+        self._rebuild_search_cache()
+        logger.info("联系人删除成功: %s (%s)", deleted_contact.name, deleted_contact.phone)
+        return True, "删除成功"
+
+    def set_frequent(self, index: int, is_frequent: bool) -> Tuple[bool, str]:
+        """设置（而非就地翻转）指定联系人的常用标记
+
+        就地修改 contact.is_frequent 后若保存失败，内存对象会停留在被改过的状态，
+        界面与数据库随即不一致。因此这里在副本上修改，成功后再替换内存对象。
+
+        Args:
+            index: 联系人索引
+            is_frequent: 目标常用标记
+
+        Returns:
+            Tuple[bool, str]: (操作结果, 结果消息)
+        """
+        if not 0 <= index < len(self.storage.contacts):
+            raise IndexError("Invalid contact index")
+
+        old_contact = self.storage.contacts[index]
+        if old_contact.is_frequent == is_frequent:
+            return True, "无需修改"
+
+        updated = Contact(
+            old_contact.name,
+            old_contact.phone,
+            old_contact.email,
+            old_contact.remark,
+            is_frequent,
+        )
+        return self.update_contact(index, updated)
+
+    # ------------------------------------------------------------------
+    # 查询与搜索
+    # ------------------------------------------------------------------
     def search_by_name(self, name: str) -> List[Contact]:
-        """优化的姓名搜索，使用预计算的小写名称"""
+        """按姓名模糊搜索（不区分大小写的子串匹配）
+
+        Args:
+            name: 要搜索的姓名片段
+
+        Returns:
+            List[Contact]: 搜索结果列表
+
+        Raises:
+            TypeError: 如果 name 不是字符串
+        """
         if not isinstance(name, str):
             raise TypeError("name must be a string")
-        
         if not name:
             return []
-        
+
         name_lower = name.lower()
-        results = [item['contact'] for item in self._search_cache if name_lower in item['name_lower']]
-        logger.info(f"Name search '{name}' returned {len(results)} results")
+        results = [item["contact"] for item in self._search_cache if name_lower in item["name_lower"]]
+        logger.debug("姓名搜索 '%s' 命中 %d 条", name, len(results))
         return results
 
     def search_by_phone(self, phone: str) -> List[Contact]:
-        """优化的电话搜索"""
+        """按电话号码模糊搜索（子串匹配）
+
+        注意：这是子串匹配而非精确匹配，输入 "138" 会命中所有含 138 的号码。
+
+        Args:
+            phone: 要搜索的电话号码片段
+
+        Returns:
+            List[Contact]: 搜索结果列表
+
+        Raises:
+            TypeError: 如果 phone 不是字符串
+        """
         if not isinstance(phone, str):
             raise TypeError("phone must be a string")
-        
         if not phone:
             return []
-        
-        results = [item['contact'] for item in self._search_cache if phone in item['phone']]
-        logger.info(f"Phone search '{phone}' returned {len(results)} results")
+
+        results = [item["contact"] for item in self._search_cache if phone in item["phone"]]
+        logger.debug("电话搜索 '%s' 命中 %d 条", phone, len(results))
         return results
-    
-    def search_by_keypad(self, keypad_code: str) -> List[Contact]:
-        """九键搜索：根据数字序列搜索联系人"""
-        if not isinstance(keypad_code, str):
-            raise TypeError("keypad_code must be a string")
-        
-        if not keypad_code:
-            return []
-        
-        # 验证输入是否为纯数字
-        if not keypad_code.isdigit():
-            raise ValueError("keypad_code must contain only digits")
-        
-        results = [item['contact'] for item in self._search_cache if keypad_code in item['keypad_code']]
-        logger.info(f"Keypad search '{keypad_code}' returned {len(results)} results")
-        return results
-    
+
     def search_by_email(self, email: str) -> List[Contact]:
-        """根据邮箱搜索联系人"""
+        """按邮箱模糊搜索（不区分大小写的子串匹配）
+
+        Args:
+            email: 要搜索的邮箱片段
+
+        Returns:
+            List[Contact]: 搜索结果列表
+
+        Raises:
+            TypeError: 如果 email 不是字符串
+        """
         if not isinstance(email, str):
             raise TypeError("email must be a string")
-        
         if not email:
             return []
-        
+
         email_lower = email.lower()
-        results = [item['contact'] for item in self._search_cache if email_lower in item['contact'].email.lower()]
-        logger.info(f"Email search '{email}' returned {len(results)} results")
+        results = [item["contact"] for item in self._search_cache if email_lower in item["email_lower"]]
+        logger.debug("邮箱搜索 '%s' 命中 %d 条", email, len(results))
+        return results
+
+    def search_by_keypad(self, keypad_code: str) -> List[Contact]:
+        """九键搜索：按数字序列前缀匹配联系人姓名的九键编码
+
+        采用前缀匹配而非任意位置的子串匹配：九键输入是逐位收窄的过程，
+        若用子串匹配，输入单个 "9" 会命中编码中段含 9 的全部联系人。
+
+        仅对拉丁字母姓名有效：中文姓名没有对应的拉丁字母编码，九键编码为空串，
+        因此不会被任何数字序列命中。
+
+        Args:
+            keypad_code: 九键键盘数字序列
+
+        Returns:
+            List[Contact]: 搜索结果列表
+
+        Raises:
+            TypeError: 如果 keypad_code 不是字符串
+            ValueError: 如果 keypad_code 不是纯数字
+        """
+        if not isinstance(keypad_code, str):
+            raise TypeError("keypad_code must be a string")
+        if not keypad_code:
+            return []
+        if not keypad_code.isdigit():
+            raise ValueError("keypad_code must contain only digits")
+
+        results = [
+            item["contact"]
+            for item in self._search_cache
+            if item["keypad_code"].startswith(keypad_code)
+        ]
+        logger.debug("九键搜索 '%s' 命中 %d 条", keypad_code, len(results))
+        return results
+
+    def search_all(self, keyword: str) -> List[Contact]:
+        """统一搜索：一次遍历同时匹配姓名、电话、邮箱和九键编码
+
+        Args:
+            keyword: 搜索关键词
+
+        Returns:
+            List[Contact]: 去重后的搜索结果列表
+
+        Raises:
+            TypeError: 如果 keyword 不是字符串
+        """
+        if not isinstance(keyword, str):
+            raise TypeError("keyword must be a string")
+        if not keyword:
+            return []
+
+        keyword_lower = keyword.lower()
+        is_digits = keyword.isdigit()
+
+        results: List[Contact] = []
+        for item in self._search_cache:
+            if (
+                keyword_lower in item["name_lower"]
+                or keyword in item["phone"]
+                or (item["email_lower"] and keyword_lower in item["email_lower"])
+                or (is_digits and item["keypad_code"].startswith(keyword))
+            ):
+                results.append(item["contact"])
         return results
 
     def get_all_contacts(self) -> List[Contact]:
-        """获取所有联系人"""
+        """获取所有联系人
+
+        Returns:
+            List[Contact]: 联系人列表的浅拷贝
+        """
         return self.storage.contacts.copy()
 
     def get_frequent_contacts(self) -> List[Contact]:
-        """获取常用联系人"""
-        return [item['contact'] for item in self._search_cache if item['contact'].is_frequent]
-    
+        """获取常用联系人
+
+        Returns:
+            List[Contact]: 常用联系人列表
+        """
+        return [item["contact"] for item in self._search_cache if item["contact"].is_frequent]
+
     def get_contact_by_index(self, index: int) -> Optional[Contact]:
-        """根据索引获取联系人"""
+        """根据索引获取联系人
+
+        Args:
+            index: 联系人索引
+
+        Returns:
+            Optional[Contact]: 联系人对象，索引无效时返回 None
+        """
         if not 0 <= index < len(self.storage.contacts):
             return None
         return self.storage.contacts[index]
-    
+
     def get_contacts_count(self) -> int:
-        """获取联系人总数"""
+        """获取联系人总数
+
+        Returns:
+            int: 联系人总数
+        """
         return len(self.storage.contacts)

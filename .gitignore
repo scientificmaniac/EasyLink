@@ -1,0 +1,54 @@
+# ===================== Python =====================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+
+# 虚拟环境
+.venv/
+venv/
+env/
+ENV/
+
+# 测试与类型检查缓存
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+
+# ===================== PyInstaller =====================
+# 注意：EasyLink.spec 属于源码，必须纳入版本控制；
+# 下面两项只是 `pyinstaller` 命令产生的中间产物。
+build/
+dist/
+
+# ===================== IDE / 编辑器 =====================
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+
+# ===================== 运行期数据（不应提交） =====================
+# SQLite 运行时数据库：首次启动时会由 contacts.json 自动迁移生成
+contacts.db
+contacts.db-journal
+contacts.db-wal
+
+# 导出产物（由「数据导出」按钮生成）
+contacts.txt
+contacts.md
+contacts.xlsx
+
+# 数据修复备份
+contacts.json.*.bak
+
+# 日志
+*.log
+logs/
